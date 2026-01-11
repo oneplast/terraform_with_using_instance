@@ -1,0 +1,27 @@
+.idea
+
+# Terraform Working Directory
+.terraform/
+**/.terraform/*
+
+# Terraform State
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Terraform variables (often contain secrets)
+*.tfvars
+*.tfvars.json
+terraform.tfvars
+terraform.tfvars.json
+
+# Override files (rare but can contain local stuff)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# CLI config (can include credentials / tokens)
+.terraformrc
+terraform.rc
