@@ -53,6 +53,17 @@ resource "aws_subnet" "subnet_3" {
   }
 }
 
+resource "aws_subnet" "subnet_4" {
+  vpc_id = aws_vpc.vpc_1.id
+  cidr_block = "10.0.4.0/24"
+  availability_zone = "${var.region}d"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "${var.prefix}-subnet-4"
+  }
+}
+
 resource "aws_internet_gateway" "igw_1" {
   vpc_id = aws_vpc.vpc_1.id
 
@@ -86,6 +97,11 @@ resource "aws_route_table_association" "association_2" {
 
 resource "aws_route_table_association" "association_3" {
   subnet_id = aws_subnet.subnet_3.id
+  route_table_id = aws_route_table.rt_1.id
+}
+
+resource "aws_route_table_association" "association_4" {
+  subnet_id = aws_subnet.subnet_4.id
   route_table_id = aws_route_table.rt_1.id
 }
 
@@ -189,7 +205,7 @@ docker run -d \
   --network common \
   -p 6379:6379 \
   -e TZ=Asia/Seoul \
-  redis --requirepass oneplast
+  redis --requirepass ${var.password_1}
 
 # MySQL 설치
 docker run -d \
@@ -199,22 +215,22 @@ docker run -d \
   -v /infra_practice/terraform/mysql_1/volumes/etc/mysql/conf.d:/etc/mysql/conf.d \
   --network common \
   -p 3306:3306 \
-  -e MYSQL_ROOT_PASSWORD=oneplast \
+  -e MYSQL_ROOT_PASSWORD=${var.password_1} \
   -e TZ=Asia/Seoul \
   mysql
 
 # MySQL 컨테이너가 준비될 때까지 대기
 echo "MySQL이 기동될 때까지 대기 중..."
-until docker exec mysql_1 mysql -uroot -poneplast -e "SELECT 1" &> /dev/null; do
+until docker exec mysql_1 mysql -uroot -p${var.password_1} -e "SELECT 1" &> /dev/null; do
   echo "MySQL이 아직 준비되지 않음. 5초 후 재시도..."
   sleep 5
 done
 echo "MySQL이 준비됨. 초기화 스크립트 실행 중..."
 
-docker exec mysql_1 mysql -uroot -poneplast -e "
+docker exec mysql_1 mysql -uroot -p${var.password_1} -e "
 CREATE USER 'oneplocal'@'127.0.0.1' IDENTIFIED WITH caching_sha2_password BY '1234';
 CREATE USER 'oneplocal'@'172.18.%' IDENTIFIED WITH caching_sha2_password BY '1234';
-CREATE USER 'oneplast'@'%' IDENTIFIED WITH caching_sha2_password BY 'oneplast';
+CREATE USER 'oneplast'@'%' IDENTIFIED WITH caching_sha2_password BY '${var.password_1}';
 
 GRANT ALL PRIVILEGES ON *.* TO 'oneplocal'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON *.* TO 'oneplocal'@'172.18.%';
@@ -228,10 +244,35 @@ FLUSH PRIVILEGES;
 END_OF_FILE
 }
 
+data "aws_ami" "latest_amazon_linux" {
+  most_recent = true
+  owners = ["amazon"]
+
+  filter {
+    name = "name"
+    values = ["al2023-ami-2023.*-x86_64"]
+  }
+
+  filter {
+    name = "architecture"
+    values = ["x86_64"]
+  }
+
+  filter {
+    name = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  filter {
+    name = "root-device-type"
+    values = ["ebs"]
+  }
+}
+
 resource "aws_instance" "ec2_1" {
-  ami = "ami-0b818a04bc9c2133c"
+  ami = data.aws_ami.latest_amazon_linux.id
   instance_type = "t3.micro"
-  subnet_id = aws_subnet.subnet_1.id
+  subnet_id = aws_subnet.subnet_4.id
   vpc_security_group_ids = [aws_security_group.sg_1.id]
   associate_public_ip_address = true
 
